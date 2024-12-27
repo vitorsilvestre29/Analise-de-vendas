@@ -1,0 +1,146 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Dashboard de Vendas</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://unpkg.com/htmx.org@1.9.10"></script>
+</head>
+<body class="bg-gray-100 min-h-screen">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        <div class="mb-8">
+            <h1 class="text-3xl font-bold text-gray-900">Dashboard de Vendas</h1>
+            <p class="mt-2 text-gray-600">Visão geral do desempenho de vendas</p>
+        </div>
+
+        <!-- Filters -->
+        <div class="bg-white rounded-xl shadow-lg p-6 mb-8">
+            <div class="flex flex-col md:flex-row gap-4">
+                <div class="flex-1">
+                    <input
+                        type="text"
+                        name="search"
+                        placeholder="Buscar produto..."
+                        class="w-full px-4 py-2 border rounded-lg"
+                        hx-get="/api/sales"
+                        hx-trigger="keyup changed delay:500ms"
+                        hx-target="#sales-table"
+                    >
+                </div>
+                
+                <div class="flex flex-col sm:flex-row gap-4">
+                    <select
+                        name="payment_method"
+                        class="px-4 py-2 border rounded-lg"
+                        hx-get="/api/sales"
+                        hx-trigger="change"
+                        hx-target="#sales-table"
+                    >
+                        <option value="">Todos os pagamentos</option>
+                        <option value="Cartão de Crédito">Cartão de Crédito</option>
+                        <option value="Boleto">Boleto</option>
+                        <option value="PIX">PIX</option>
+                    </select>
+
+                    <input
+                        type="date"
+                        name="start_date"
+                        class="px-4 py-2 border rounded-lg"
+                        hx-get="/api/sales"
+                        hx-trigger="change"
+                        hx-target="#sales-table"
+                    >
+                    <input
+                        type="date"
+                        name="end_date"
+                        class="px-4 py-2 border rounded-lg"
+                        hx-get="/api/sales"
+                        hx-trigger="change"
+                        hx-target="#sales-table"
+                    >
+                </div>
+            </div>
+        </div>
+
+        <!-- Stats Cards -->
+        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+            <div class="bg-white rounded-xl p-6 shadow-lg">
+                <h3 class="text-lg font-semibold text-gray-700">Receita Total</h3>
+                <p class="text-2xl font-bold mt-2" id="total-revenue">R$ 0,00</p>
+            </div>
+            <div class="bg-white rounded-xl p-6 shadow-lg">
+                <h3 class="text-lg font-semibold text-gray-700">Lucro Total</h3>
+                <p class="text-2xl font-bold mt-2" id="total-profit">R$ 0,00</p>
+            </div>
+            <div class="bg-white rounded-xl p-6 shadow-lg">
+                <h3 class="text-lg font-semibold text-gray-700">Total de Vendas</h3>
+                <p class="text-2xl font-bold mt-2" id="total-sales">0</p>
+            </div>
+            <div class="bg-white rounded-xl p-6 shadow-lg">
+                <h3 class="text-lg font-semibold text-gray-700">Ticket Médio</h3>
+                <p class="text-2xl font-bold mt-2" id="average-ticket">R$ 0,00</p>
+            </div>
+        </div>
+
+        <!-- Sales Table -->
+        <div class="bg-white rounded-xl shadow-lg p-6">
+            <h2 class="text-xl font-semibold mb-4">Histórico de Vendas</h2>
+            <div class="overflow-x-auto">
+                <table class="min-w-full" id="sales-table">
+                    <thead class="bg-gray-50">
+                        <tr>
+                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Produto</th>
+                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Data</th>
+                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Qtd</th>
+                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Preço</th>
+                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Receita</th>
+                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Lucro</th>
+                        </tr>
+                    </thead>
+                    <tbody class="divide-y divide-gray-200">
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        document.body.addEventListener('htmx:afterSwap', function(evt) {
+            if (evt.detail.target.id === 'sales-table') {
+                const data = JSON.parse(evt.detail.xhr.response);
+                updateStats(data);
+            }
+        });
+
+        function updateStats(data) {
+            const stats = calculateStats(data);
+            document.getElementById('total-revenue').textContent = formatCurrency(stats.total_revenue);
+            document.getElementById('total-profit').textContent = formatCurrency(stats.total_profit);
+            document.getElementById('total-sales').textContent = stats.total_sales;
+            document.getElementById('average-ticket').textContent = formatCurrency(stats.average_ticket);
+        }
+
+        function calculateStats(data) {
+            const totalRevenue = data.reduce((acc, item) => acc + item.receita, 0);
+            const totalProfit = data.reduce((acc, item) => acc + item.lucro, 0);
+            const totalSales = data.reduce((acc, item) => acc + item.quantidadeVendida, 0);
+            const averageTicket = totalSales > 0 ? totalRevenue / totalSales : 0;
+
+            return {
+                total_revenue: totalRevenue,
+                total_profit: totalProfit,
+                total_sales: totalSales,
+                average_ticket: averageTicket
+            };
+        }
+
+        function formatCurrency(value) {
+            return new Intl.NumberFormat('pt-BR', {
+                style: 'currency',
+                currency: 'BRL'
+            }).format(value);
+        }
+    </script>
+</body>
+</html>
